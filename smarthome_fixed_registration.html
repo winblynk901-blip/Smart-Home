@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home - Sistem Rumah Cerdas</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #080C14; color: #F3F4F6; }
+        .glass-card { background: rgba(18, 27, 43, 0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.4); }
+        .active-tab { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF !important; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); }
+        
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin-slow 2s linear infinite;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #080C14; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #10B981; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row overflow-x-hidden selection:bg-emerald-500 selection:text-white relative">
+
+    <!-- ================= MODAL AUTHENTICATION (LOGIN & REGISTER AKTIF) ================= -->
+    <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#080C14]/90 backdrop-blur-2xl transition-all duration-300">
+        <div class="glass-card w-full max-w-md p-8 rounded-3xl border border-white/10 space-y-6 relative overflow-hidden shadow-2xl">
+            <div class="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="text-center space-y-2">
+                <div class="inline-flex p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 mb-2 shadow-inner">
+                    <i data-lucide="shield-check" class="w-8 h-8"></i>
+                </div>
+                <h2 id="auth-title" class="text-2xl font-bold text-white tracking-tight">Login Pemilik Rumah</h2>
+                <p id="auth-subtitle" class="text-xs text-gray-400">Masuk untuk mengakses dan mengontrol rumah pintar Anda</p>
+            </div>
+
+            <!-- Pesan Error / Notifikasi -->
+            <div id="auth-error" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium text-center"></div>
+
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <!-- Kolom Nama Lengkap (Hanya tampil saat Buat Akun Baru) -->
+                <div id="name-field" class="hidden space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Nama Lengkap</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                        <input type="text" id="auth-name" autocomplete="name" maxlength="80" placeholder="Nama lengkap Anda" class="w-full bg-white/5 border border-white/10 rounded-xl px-10 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all">
+                    </div>
+                </div>
+
+                <div id="confirm-password-field" class="hidden space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Konfirmasi Kata Sandi</label>
+                    <div class="relative">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                        <input type="password" id="auth-confirm-password" placeholder="Ulangi kata sandi" autocomplete="new-password" class="w-full bg-white/5 border border-white/10 rounded-xl px-10 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Email Pemilik</label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                        <input type="email" id="auth-email" required autocomplete="email" placeholder="pemilik@smarthome.id" class="w-full bg-white/5 border border-white/10 rounded-xl px-10 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Kata Sandi</label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                        <input type="password" id="auth-password" required minlength="6" autocomplete="current-password" placeholder="Minimal 6 karakter" class="w-full bg-white/5 border border-white/10 rounded-xl px-10 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all">
+                    </div>
+                </div>
+
+                <button type="submit" id="auth-btn" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all">
+                    Masuk Sekarang
+                </button>
+            </form>
+
+            <div class="text-center pt-2 border-t border-white/5">
+                <p id="toggle-auth-text" class="text-xs text-gray-400">
+                    Belum punya akun? <button type="button" onclick="toggleAuthMode()" class="text-emerald-400 font-semibold hover:underline focus:outline-none cursor-pointer">Buat Akun Baru</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR NAVIGASI -->
+    <aside class="w-full lg:w-72 bg-[#05080E]/90 backdrop-blur-xl border-r border-white/5 p-6 flex flex-col justify-between shrink-0">
+        <div>
+            <div class="flex items-center space-x-3 mb-10">
+                <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 shadow-inner">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight">Smart Home</h1>
+                    <p class="text-xs text-gray-400">Sistem Rumah Cerdas</p>
+                </div>
+            </div>
+
+            <nav class="space-y-1.5">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all active-tab">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Dashboard</span>
+                </button>
+                <button onclick="switchTab('monitoring')" id="nav-monitoring" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all">
+                    <i data-lucide="line-chart" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Monitoring</span>
+                </button>
+                <button onclick="switchTab('kontrol')" id="nav-kontrol" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all">
+                    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Kontrol Perangkat</span>
+                </button>
+                <button onclick="switchTab('riwayat')" id="nav-riwayat" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all">
+                    <i data-lucide="history" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Riwayat Data</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-white/5 flex flex-col items-center space-y-4">
+            <!-- Profil Pengguna Login -->
+            <div class="w-full bg-white/[0.03] p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5 overflow-hidden">
+                    <div class="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0" id="user-avatar">
+                        U
+                    </div>
+                    <div class="truncate">
+                        <h4 id="user-display-name" class="text-xs font-semibold text-white truncate">Pemilik Rumah</h4>
+                        <p id="user-display-email" class="text-[10px] text-gray-400 truncate">user@smarthome.id</p>
+                    </div>
+                </div>
+                <button onclick="logoutUser()" class="p-1.5 hover:bg-rose-500/10 text-gray-400 hover:text-rose-400 rounded-lg transition-all" title="Keluar">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- ESP Status Card -->
+            <div class="w-full bg-gradient-to-br from-white/[0.03] to-transparent p-4 rounded-2xl border border-white/5 relative overflow-hidden text-center">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl"></div>
+                <div class="flex justify-center mb-2">
+                    <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+                        <i data-lucide="cpu" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <p class="text-xs font-semibold text-white">ESP32 Controller</p>
+                <span id="sidebar-esp-status" class="text-[10px] text-emerald-400 mt-1 block">● Memeriksa...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- KONTEN UTAMA -->
+    <main class="flex-1 p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+        
+        <!-- HEADER ATAS -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.02] border border-white/5 px-6 py-4 rounded-2xl backdrop-blur-xl">
+            <div class="flex items-center space-x-4 text-xs text-gray-300 w-full sm:w-auto justify-between sm:justify-start">
+                <div class="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
+                    <i data-lucide="calendar" class="w-4 h-4 text-emerald-400"></i>
+                    <span id="header-date">Rabu, 11 Nov 2026</span>
+                </div>
+                <div class="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
+                    <i data-lucide="clock" class="w-4 h-4 text-emerald-400"></i>
+                    <span id="header-time">18:17 WITA</span>
+                </div>
+            </div>
+            <div id="header-status-badge" class="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-full text-xs font-medium text-emerald-400 transition-all duration-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span id="connection-status-text">ESP32 Online</span>
+            </div>
+        </header>
+
+        <!-- ================= 1. TAB DASHBOARD ================= -->
+        <section id="tab-dashboard" class="space-y-6">
+            <div class="glass-card rounded-3xl p-8 relative overflow-hidden bg-gradient-to-r from-emerald-950/20 via-[#101A2B]/80 to-[#0A111E]">
+                <div class="absolute right-0 top-0 bottom-0 w-1/2 opacity-15 pointer-events-none hidden md:block bg-cover bg-center" style="background-image: url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80')"></div>
+                <div class="relative z-10 space-y-2">
+                    <h2 class="text-3xl lg:text-4xl font-bold text-white tracking-tight">Selamat Datang, <span id="welcome-username" class="text-emerald-400">Pemilik Rumah</span></h2>
+                    <p class="text-sm text-gray-400">Pantau kondisi mikroklimat ruangan dan kendalikan seluruh perangkat rumah pintar Anda.</p>
+                </div>
+            </div>
+
+            <!-- Kartu Sensor -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden border-l-4 border-l-emerald-500">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-semibold text-gray-400">Suhu 1</span>
+                        <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl"><i data-lucide="thermometer" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span id="dash-suhu1" class="text-3xl font-extrabold text-white">0.0</span>
+                        <span class="text-lg text-emerald-400 font-bold">°C</span>
+                    </div>
+                </div>
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden border-l-4 border-l-blue-500">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-semibold text-gray-400">Kelembaban 1</span>
+                        <div class="p-2 bg-blue-500/10 text-blue-400 rounded-xl"><i data-lucide="droplets" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span id="dash-lembaban1" class="text-3xl font-extrabold text-white">0</span>
+                        <span class="text-lg text-blue-400 font-bold">%</span>
+                    </div>
+                </div>
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden border-l-4 border-l-emerald-400">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-semibold text-gray-400">Suhu 2</span>
+                        <div class="p-2 bg-emerald-400/10 text-emerald-400 rounded-xl"><i data-lucide="thermometer" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span id="dash-suhu2" class="text-3xl font-extrabold text-white">0.0</span>
+                        <span class="text-lg text-emerald-400 font-bold">°C</span>
+                    </div>
+                </div>
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden border-l-4 border-l-blue-400">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-semibold text-gray-400">Kelembaban 2</span>
+                        <div class="p-2 bg-blue-400/10 text-blue-400 rounded-xl"><i data-lucide="droplets" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span id="dash-lembaban2" class="text-3xl font-extrabold text-white">0</span>
+                        <span class="text-lg text-blue-400 font-bold">%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kontrol Perangkat (Dashboard) -->
+            <div class="glass-card rounded-3xl p-6 space-y-6">
+                <div class="flex justify-between items-center border-b border-white/5 pb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg"><i data-lucide="power" class="w-5 h-5"></i></div>
+                        <h3 class="font-bold text-lg text-white">Kontrol Perangkat</h3>
+                    </div>
+                    <button onclick="toggleAllDevices(true)" class="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all">
+                        <i data-lucide="power" class="w-3.5 h-3.5"></i>
+                        <span>Nyalakan Semua</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Lampu WC -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-LampuWC" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dash-LampuWC" onchange="updateDeviceState('LampuWC', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu WC</h4>
+                            <span id="status-text-LampuWC" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu RT -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-LampuRuangTamu" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dash-LampuRuangTamu" onchange="updateDeviceState('LampuRuangTamu', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu RT</h4>
+                            <span id="status-text-LampuRuangTamu" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu Belakang -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-LampuBelakang" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dash-LampuBelakang" onchange="updateDeviceState('LampuBelakang', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu Belakang</h4>
+                            <span id="status-text-LampuBelakang" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu Hias -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-LampuHias" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dash-LampuHias" onchange="updateDeviceState('LampuHias', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu Hias</h4>
+                            <span id="status-text-LampuHias" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Kipas Angin 1 -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-KipasAngin1" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i id="fan-icon-1" data-lucide="fan" class="w-5 h-5"></i></div>
+                            <span class="px-2.5 py-1 bg-white/5 rounded-full text-[10px] text-gray-400 font-medium">Auto Suhu</span>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Kipas Angin 1</h4>
+                            <span id="status-text-KipasAngin1" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Kipas Angin 2 -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-KipasAngin2" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i id="fan-icon-2" data-lucide="fan" class="w-5 h-5"></i></div>
+                            <span class="px-2.5 py-1 bg-white/5 rounded-full text-[10px] text-gray-400 font-medium">Auto Suhu</span>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Kipas Angin 2</h4>
+                            <span id="status-text-KipasAngin2" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+
+                    <!-- Solenoid Pintu -->
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between sm:col-span-2 transition-all hover:border-white/10">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-bg-SolenoidPintu" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i data-lucide="lock" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dash-SolenoidPintu" onchange="updateDeviceState('SolenoidPintu', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Solenoid Pintu</h4>
+                            <span id="status-text-SolenoidPintu" class="text-xs font-medium text-gray-400">Terkunci</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 2. TAB MONITORING ================= -->
+        <section id="tab-monitoring" class="space-y-6 hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Monitoring</h2>
+                    <p class="text-sm text-gray-400">Pantau kondisi lingkungan, beban, dan status sistem secara real-time</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-emerald-500">
+                    <span class="text-xs text-gray-400">Suhu 1</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="mon-suhu1">0.0</span> <span class="text-sm text-emerald-400">°C</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-blue-500">
+                    <span class="text-xs text-gray-400">Kelembaban 1</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="mon-lembaban1">0</span> <span class="text-sm text-blue-400">%</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-emerald-400">
+                    <span class="text-xs text-gray-400">Suhu 2</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="mon-suhu2">0.0</span> <span class="text-sm text-emerald-400">°C</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-blue-400">
+                    <span class="text-xs text-gray-400">Kelembaban 2</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="mon-lembaban2">0</span> <span class="text-sm text-blue-400">%</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-emerald-500 flex flex-col justify-between">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-400">Status Sistem</span>
+                        <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                    <div>
+                        <h4 id="mon-esp-title" class="text-sm font-bold text-emerald-400">ESP32 Terhubung</h4>
+                        <span id="mon-esp-desc" class="text-[10px] text-gray-400">Sistem berjalan normal</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card rounded-3xl p-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-white text-base">Grafik Suhu (°C)</h3>
+                        <div class="flex items-center space-x-4 text-xs">
+                            <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span><span class="text-gray-300">Suhu 1</span></span>
+                            <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span class="text-gray-300">Suhu 2</span></span>
+                        </div>
+                    </div>
+                    <div class="w-full h-72"><canvas id="chartSuhu"></canvas></div>
+                </div>
+
+                <div class="glass-card rounded-3xl p-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-white text-base">Grafik Kelembaban (%)</h3>
+                        <div class="flex items-center space-x-4 text-xs">
+                            <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span><span class="text-gray-300">Kelembaban 1</span></span>
+                            <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span class="text-gray-300">Kelembaban 2</span></span>
+                        </div>
+                    </div>
+                    <div class="w-full h-72"><canvas id="chartKelembaban"></canvas></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass-card rounded-3xl p-6 space-y-4 lg:col-span-2">
+                    <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                        <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+                        <span>Status Beban (Perangkat Menyala)</span>
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-white/[0.02] p-3 rounded-2xl border border-white/5 text-center">
+                            <i data-lucide="lamp" class="w-5 h-5 text-gray-500 mx-auto mb-1"></i>
+                            <span class="text-xs font-bold text-white block">Lampu WC</span>
+                            <span id="load-LampuWC" class="text-[10px] text-gray-400 font-semibold">OFF</span>
+                        </div>
+                        <div class="bg-white/[0.02] p-3 rounded-2xl border border-white/5 text-center">
+                            <i data-lucide="lamp" class="w-5 h-5 text-gray-500 mx-auto mb-1"></i>
+                            <span class="text-xs font-bold text-white block">Lampu RT</span>
+                            <span id="load-LampuRuangTamu" class="text-[10px] text-gray-400 font-semibold">OFF</span>
+                        </div>
+                        <div class="bg-white/[0.02] p-3 rounded-2xl border border-white/5 text-center">
+                            <i data-lucide="lamp" class="w-5 h-5 text-gray-500 mx-auto mb-1"></i>
+                            <span class="text-xs font-bold text-white block">Lampu Belakang</span>
+                            <span id="load-LampuBelakang" class="text-[10px] text-gray-400 font-semibold">OFF</span>
+                        </div>
+                        <div class="bg-white/[0.02] p-3 rounded-2xl border border-white/5 text-center">
+                            <i data-lucide="lamp" class="w-5 h-5 text-gray-500 mx-auto mb-1"></i>
+                            <span class="text-xs font-bold text-white block">Lampu Hias</span>
+                            <span id="load-LampuHias" class="text-[10px] text-gray-400 font-semibold">OFF</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-3xl p-6 space-y-4">
+                    <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                        <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+                        <span>Ringkasan Sistem</span>
+                    </h3>
+                    <div class="space-y-3 text-xs">
+                        <div class="flex justify-between items-center bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                            <span class="text-gray-400">Beban Aktif</span>
+                            <span id="summary-active-load" class="font-bold text-white">0 Perangkat</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                            <span class="text-gray-400">Status Sistem</span>
+                            <span class="font-bold text-emerald-400">Normal</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                            <span class="text-gray-400">Koneksi ESP32</span>
+                            <span id="summary-conn-status" class="font-bold text-emerald-400">Terhubung</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 3. TAB KONTROL PERANGKAT ================= -->
+        <section id="tab-kontrol" class="space-y-6 hidden">
+            <div class="glass-card rounded-3xl p-8 relative overflow-hidden bg-gradient-to-r from-emerald-950/20 via-[#101A2B]/80 to-[#0A111E]">
+                <div class="absolute right-0 top-0 bottom-0 w-1/2 opacity-25 pointer-events-none hidden md:block bg-cover bg-center" style="background-image: url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80')"></div>
+                <div class="relative z-10 space-y-2">
+                    <h2 class="text-2xl font-bold text-white">Kontrol Perangkat</h2>
+                    <p class="text-sm text-gray-400">Kendalikan penerangan, sistem pendingin udara, dan akses pintu secara langsung.</p>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 space-y-4">
+                <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                    <i data-lucide="lightbulb" class="w-5 h-5 text-emerald-400"></i>
+                    <span>Kontrol Penerangan</span>
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="p-2.5 bg-white/5 text-gray-400 rounded-xl"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ctrl-LampuWC" onchange="updateDeviceState('LampuWC', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu WC</h4>
+                            <span id="ctrl-status-text-LampuWC" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="p-2.5 bg-white/5 text-gray-400 rounded-xl"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ctrl-LampuRuangTamu" onchange="updateDeviceState('LampuRuangTamu', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu RT</h4>
+                            <span id="ctrl-status-text-LampuRuangTamu" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="p-2.5 bg-white/5 text-gray-400 rounded-xl"><i data-lucide="lamp" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ctrl-LampuBelakang" onchange="updateDeviceState('LampuBelakang', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu Belakang</h4>
+                            <span id="ctrl-status-text-LampuBelakang" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="p-2.5 bg-white/5 text-gray-400 rounded-xl"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ctrl-LampuHias" onchange="updateDeviceState('LampuHias', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm">Lampu Hias</h4>
+                            <span id="ctrl-status-text-LampuHias" class="text-xs font-medium text-gray-400">Mati</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Status Kipas Angin -->
+                <div class="glass-card rounded-3xl p-6 space-y-4">
+                    <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                        <i data-lucide="fan" class="w-5 h-5 text-emerald-400"></i>
+                        <span>Status Kipas Angin (Otomatis Suhu)</span>
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-start mb-3">
+                                <div id="ctrl-icon-bg-KipasAngin1" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i id="ctrl-fan-icon-1" data-lucide="fan" class="w-5 h-5"></i></div>
+                                <span class="px-2.5 py-1 bg-white/5 rounded-full text-[10px] text-gray-400 font-medium">Auto Suhu</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">Kipas Angin 1</h4>
+                                <span id="ctrl-status-text-KipasAngin1" class="text-xs font-medium text-gray-400">Mati</span>
+                            </div>
+                        </div>
+                        <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-start mb-3">
+                                <div id="ctrl-icon-bg-KipasAngin2" class="p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all"><i id="ctrl-fan-icon-2" data-lucide="fan" class="w-5 h-5"></i></div>
+                                <span class="px-2.5 py-1 bg-white/5 rounded-full text-[10px] text-gray-400 font-medium">Auto Suhu</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">Kipas Angin 2</h4>
+                                <span id="ctrl-status-text-KipasAngin2" class="text-xs font-medium text-gray-400">Mati</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kontrol Pintu (Solenoid) -->
+                <div class="glass-card rounded-3xl p-6 space-y-4">
+                    <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                        <i data-lucide="lock" class="w-5 h-5 text-emerald-400"></i>
+                        <span>Kontrol Pintu</span>
+                    </h3>
+                    <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl"><i data-lucide="lock" class="w-6 h-6"></i></div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">Solenoid Pintu</h4>
+                                <span id="ctrl-status-text-SolenoidPintu" class="text-xs font-semibold text-gray-400">Terkunci (OFF)</span>
+                                <p class="text-[10px] text-gray-400 mt-0.5">ON = Terbuka | OFF = Terkunci</p>
+                            </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="ctrl-SolenoidPintu" onchange="updateDeviceState('SolenoidPintu', this.checked)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 4. TAB RIWAYAT DATA ================= -->
+        <section id="tab-riwayat" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card rounded-2xl p-5 border-l-4 border-l-emerald-500">
+                    <span class="text-xs text-gray-400">Suhu 1 (Rata-rata)</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="avg-s1">0.0</span> <span class="text-sm text-emerald-400">°C</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-5 border-l-4 border-l-blue-500">
+                    <span class="text-xs text-gray-400">Kelembaban 1 (Rata-rata)</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="avg-h1">0.0</span> <span class="text-sm text-blue-400">%</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-5 border-l-4 border-l-emerald-400">
+                    <span class="text-xs text-gray-400">Suhu 2 (Rata-rata)</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="avg-s2">0.0</span> <span class="text-sm text-emerald-400">°C</span></h3>
+                </div>
+                <div class="glass-card rounded-2xl p-5 border-l-4 border-l-blue-400">
+                    <span class="text-xs text-gray-400">Kelembaban 2 (Rata-rata)</span>
+                    <h3 class="text-2xl font-bold text-white mt-1"><span id="avg-h2">0.0</span> <span class="text-sm text-blue-400">%</span></h3>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
+                    <h3 class="font-bold text-white text-base">Riwayat Data Sensor (Interval 20 Menit)</h3>
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                        <div class="flex items-center space-x-2 bg-white/5 border border-white/5 px-3 py-2 rounded-xl text-xs text-gray-300">
+                            <i data-lucide="calendar" class="w-4 h-4 text-emerald-400"></i>
+                            <select id="filter-date" onchange="filterTableData()" class="bg-transparent text-white focus:outline-none cursor-pointer">
+                                <option value="current" selected>Hari Ini</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-2 bg-white/5 border border-white/5 px-3 py-2 rounded-xl text-xs text-gray-300">
+                            <i data-lucide="filter" class="w-4 h-4 text-emerald-400"></i>
+                            <select id="filter-sensor" onchange="filterTableData()" class="bg-transparent text-white focus:outline-none cursor-pointer">
+                                <option value="all" selected>Semua Sensor</option>
+                                <option value="normal">Normal Saja</option>
+                                <option value="warning">Tidak Normal</option>
+                            </select>
+                        </div>
+                        <button onclick="downloadCSV()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-lg shadow-emerald-500/20">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Unduh Data</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto border border-white/5 rounded-2xl max-h-96">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="bg-white/5 text-gray-400 uppercase border-b border-white/5 sticky top-0 backdrop-blur-md">
+                            <tr>
+                                <th class="px-4 py-3.5">No</th>
+                                <th class="px-4 py-3.5">Hari, Tanggal</th>
+                                <th class="px-4 py-3.5">Waktu (WITA)</th>
+                                <th class="px-4 py-3.5">Suhu 1 (°C)</th>
+                                <th class="px-4 py-3.5">Kelembaban 1 (%)</th>
+                                <th class="px-4 py-3.5">Suhu 2 (°C)</th>
+                                <th class="px-4 py-3.5">Kelembaban 2 (%)</th>
+                                <th class="px-4 py-3.5">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-white/5">
+                            <!-- Log data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Skrip Firebase, Autentikasi, & Logika Website -->
+    <script>
+        // PENTING: Lengkapi apiKey dan appId dari Firebase Console > Project settings > Your apps.
+        // Konfigurasi databaseURL dipertahankan sesuai proyek yang sudah digunakan.
+        const firebaseConfig = {
+            apiKey: "AIzaSyCz2_1ry3qdwLSJQLLrifvSZ8Lr0ILxoIs",
+            authDomain: "smart-home-807bf.firebaseapp.com",
+            databaseURL: "https://smart-home-807bf-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "smart-home-807bf",
+            appId: "1:594213282229:web:e38dce9632ca039ab4f9fc"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        let isRegisterMode = false;
+        let historyLog = [];
+        let chartSuhuInstance, chartKelembabanInstance;
+        let lastSensorData = { s1: 0, h1: 0, s2: 0, h2: 0 };
+        let lastHeartbeatTimestamp = 0;
+
+        // --- SIKLUS AUTENTIKASI (LOGIN & REGISTER) ---
+        auth.onAuthStateChanged((user) => {
+            const authModal = document.getElementById('auth-modal');
+
+            if (user) {
+                authModal.classList.add('hidden');
+
+                const displayName = user.displayName || (user.email ? user.email.split('@')[0] : 'Pemilik Rumah');
+                document.getElementById('user-display-name').innerText = displayName;
+                document.getElementById('welcome-username').innerText = displayName;
+                document.getElementById('user-display-email').innerText = user.email || '';
+                document.getElementById('user-avatar').innerText = displayName.charAt(0).toUpperCase();
+
+                initAppListeners();
+            } else {
+                authModal.classList.remove('hidden');
+            }
+        });
+
+        function showAuthMessage(message, type = 'error') {
+            const errorDiv = document.getElementById('auth-error');
+            errorDiv.innerText = message;
+            errorDiv.classList.remove('hidden');
+            errorDiv.classList.toggle('bg-rose-500/10', type === 'error');
+            errorDiv.classList.toggle('border-rose-500/20', type === 'error');
+            errorDiv.classList.toggle('text-rose-400', type === 'error');
+            errorDiv.classList.toggle('bg-emerald-500/10', type === 'success');
+            errorDiv.classList.toggle('border-emerald-500/20', type === 'success');
+            errorDiv.classList.toggle('text-emerald-400', type === 'success');
+        }
+
+        function setAuthLoading(isLoading) {
+            const btn = document.getElementById('auth-btn');
+            btn.disabled = isLoading;
+            btn.classList.toggle('opacity-60', isLoading);
+            btn.classList.toggle('cursor-not-allowed', isLoading);
+            if (isLoading) {
+                btn.innerText = isRegisterMode ? 'Membuat Akun...' : 'Memproses...';
+            } else {
+                btn.innerText = isRegisterMode ? 'Daftar Akun Baru' : 'Masuk Sekarang';
+            }
+        }
+
+        function getFriendlyAuthError(error) {
+            const messages = {
+                'auth/email-already-in-use': 'Email ini sudah terdaftar. Silakan masuk menggunakan akun tersebut.',
+                'auth/invalid-email': 'Format email belum benar. Periksa kembali alamat email Anda.',
+                'auth/weak-password': 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.',
+                'auth/user-not-found': 'Akun dengan email tersebut belum terdaftar.',
+                'auth/wrong-password': 'Kata sandi tidak sesuai. Silakan coba kembali.',
+                'auth/invalid-credential': 'Email atau kata sandi tidak sesuai.',
+                'auth/operation-not-allowed': 'Login Email/Password belum diaktifkan di Firebase Authentication.',
+                'auth/network-request-failed': 'Koneksi internet bermasalah. Periksa jaringan Anda.',
+                'auth/invalid-api-key': 'Konfigurasi Firebase API Key belum benar. Isi apiKey dari Firebase Console.',
+                'auth/too-many-requests': 'Terlalu banyak percobaan. Coba kembali beberapa saat lagi.'
+            };
+            return messages[error.code] || ('Proses autentikasi gagal: ' + (error.message || 'Terjadi kesalahan.'));
+        }
+
+        // Beralih antara tampilan login dan registrasi.
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+
+            const title = document.getElementById('auth-title');
+            const subtitle = document.getElementById('auth-subtitle');
+            const btn = document.getElementById('auth-btn');
+            const toggleText = document.getElementById('toggle-auth-text');
+            const nameField = document.getElementById('name-field');
+            const nameInput = document.getElementById('auth-name');
+            const confirmField = document.getElementById('confirm-password-field');
+            const confirmInput = document.getElementById('auth-confirm-password');
+            const passwordInput = document.getElementById('auth-password');
+            const errorDiv = document.getElementById('auth-error');
+
+            errorDiv.classList.add('hidden');
+            document.getElementById('auth-form').reset();
+
+            if (isRegisterMode) {
+                title.innerText = 'Registrasi Pemilik Rumah';
+                subtitle.innerText = 'Lengkapi data berikut untuk membuat akun Smart Home';
+                nameField.classList.remove('hidden');
+                confirmField.classList.remove('hidden');
+                nameInput.required = true;
+                confirmInput.required = true;
+                passwordInput.autocomplete = 'new-password';
+                toggleText.innerHTML = 'Sudah punya akun? <button type="button" onclick="toggleAuthMode()" class="text-emerald-400 font-semibold hover:underline focus:outline-none cursor-pointer">Masuk Sekarang</button>';
+            } else {
+                title.innerText = 'Login Pemilik Rumah';
+                subtitle.innerText = 'Masuk untuk mengakses dan mengontrol rumah pintar Anda';
+                nameField.classList.add('hidden');
+                confirmField.classList.add('hidden');
+                nameInput.required = false;
+                confirmInput.required = false;
+                passwordInput.autocomplete = 'current-password';
+                toggleText.innerHTML = 'Belum punya akun? <button type="button" onclick="toggleAuthMode()" class="text-emerald-400 font-semibold hover:underline focus:outline-none cursor-pointer">Buat Akun Baru</button>';
+            }
+
+            setAuthLoading(false);
+        }
+
+        // Menyimpan akun di Firebase Authentication dan profil pemilik di Realtime Database.
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const name = document.getElementById('auth-name').value.trim();
+            const confirmPassword = document.getElementById('auth-confirm-password').value;
+            const errorDiv = document.getElementById('auth-error');
+
+            errorDiv.classList.add('hidden');
+
+            if (isRegisterMode) {
+                if (!name) {
+                    showAuthMessage('Nama lengkap wajib diisi.');
+                    document.getElementById('auth-name').focus();
+                    return;
+                }
+                if (name.length < 3) {
+                    showAuthMessage('Nama lengkap minimal 3 karakter.');
+                    document.getElementById('auth-name').focus();
+                    return;
+                }
+                if (password.length < 6) {
+                    showAuthMessage('Kata sandi minimal 6 karakter.');
+                    document.getElementById('auth-password').focus();
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    showAuthMessage('Konfirmasi kata sandi tidak sama.');
+                    document.getElementById('auth-confirm-password').focus();
+                    return;
+                }
+            }
+
+            setAuthLoading(true);
+
+            try {
+                if (isRegisterMode) {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+
+                    await user.updateProfile({ displayName: name });
+
+                    // Data profil disimpan terpisah dari data login.
+                    await db.ref('users/' + user.uid).set({
+                        uid: user.uid,
+                        namaLengkap: name,
+                        email: email,
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+
+                    showAuthMessage('Akun berhasil dibuat. Selamat datang, ' + name + '!', 'success');
+                    // Firebase akan memicu onAuthStateChanged dan membuka dashboard.
+                } else {
+                    await auth.signInWithEmailAndPassword(email, password);
+                }
+            } catch (error) {
+                showAuthMessage(getFriendlyAuthError(error));
+                setAuthLoading(false);
+            }
+        }
+
+        function logoutUser() {
+            auth.signOut().catch((error) => {
+                console.error('Gagal keluar:', error);
+            });
+        }
+
+        // --- SISTEM UTAMA REAL-TIME SETELAH LOGIN ---
+        function initAppListeners() {
+            lucide.createIcons();
+            if (!chartSuhuInstance) initCharts();
+            updateRealtimeClock();
+            setInterval(updateRealtimeClock, 1000);
+
+            // 1. Real-time Listener Sensor
+            db.ref('sensor').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    lastSensorData = {
+                        s1: parseFloat(data.suhu || 0).toFixed(1),
+                        h1: parseInt(data.kelembaban || 0),
+                        s2: parseFloat(data.suhu2 || 0).toFixed(1),
+                        h2: parseInt(data.kelembapan2 || 0)
+                    };
+                    updateSensorUI(lastSensorData);
+
+                    const kipas1On = lastSensorData.s1 > 35;
+                    const kipas2On = lastSensorData.s2 > 35;
+                    setDeviceUIFromFirebase('KipasAngin1', kipas1On);
+                    setDeviceUIFromFirebase('KipasAngin2', kipas2On);
+                }
+            });
+
+            // 2. Real-time Listener Kontrol Perangkat
+            const deviceKeys = ['LampuWC', 'LampuRuangTamu', 'LampuBelakang', 'LampuHias', 'SolenoidPintu'];
+            deviceKeys.forEach(key => {
+                db.ref(`Kontrol/${key}`).on('value', (snapshot) => {
+                    const val = snapshot.val();
+                    const isChecked = (val === 1 || val === true);
+                    setDeviceUIFromFirebase(key, isChecked);
+                });
+            });
+
+            // 3. Listener Status ESP32 Online / Offline
+            db.ref('status/esp32').on('value', (snapshot) => {
+                lastHeartbeatTimestamp = Date.now();
+                updateESPStatusUI(true);
+            });
+
+            setInterval(() => {
+                const now = Date.now();
+                if (lastHeartbeatTimestamp === 0 || (now - lastHeartbeatTimestamp > 8000)) {
+                    updateESPStatusUI(false);
+                }
+            }, 3000);
+
+            // 4. Riwayat Data Otomatis Interval 20 Menit
+            if (historyLog.length === 0) {
+                setTimeout(recordHistoryLog, 1000);
+                setInterval(recordHistoryLog, 20 * 60 * 1000);
+            }
+        }
+
+        function updateSensorUI(d) {
+            document.getElementById('dash-suhu1').innerText = d.s1;
+            document.getElementById('dash-lembaban1').innerText = d.h1;
+            document.getElementById('dash-suhu2').innerText = d.s2;
+            document.getElementById('dash-lembaban2').innerText = d.h2;
+
+            document.getElementById('mon-suhu1').innerText = d.s1;
+            document.getElementById('mon-lembaban1').innerText = d.h1;
+            document.getElementById('mon-suhu2').innerText = d.s2;
+            document.getElementById('mon-lembaban2').innerText = d.h2;
+        }
+
+        function updateESPStatusUI(isOnline) {
+            const badge = document.getElementById('header-status-badge');
+            const statusText = document.getElementById('connection-status-text');
+            const sidebarStatus = document.getElementById('sidebar-esp-status');
+            const monEspTitle = document.getElementById('mon-esp-title');
+            const monEspDesc = document.getElementById('mon-esp-desc');
+            const summaryConn = document.getElementById('summary-conn-status');
+
+            if (isOnline) {
+                badge.className = "flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-full text-xs font-medium text-emerald-400 transition-all duration-300";
+                statusText.innerText = "ESP32 Online";
+                sidebarStatus.innerText = "● Connected & Secure";
+                sidebarStatus.className = "text-[10px] text-emerald-400 mt-1 block";
+                if(monEspTitle) {
+                    monEspTitle.innerText = "ESP32 Terhubung";
+                    monEspTitle.className = "text-sm font-bold text-emerald-400";
+                    monEspDesc.innerText = "Sistem berjalan normal";
+                }
+                if(summaryConn) {
+                    summaryConn.innerText = "Terhubung";
+                    summaryConn.className = "font-bold text-emerald-400";
+                }
+            } else {
+                badge.className = "flex items-center space-x-2 bg-rose-500/10 border border-rose-500/20 px-3.5 py-1.5 rounded-full text-xs font-medium text-rose-400 transition-all duration-300";
+                statusText.innerText = "ESP32 Offline";
+                sidebarStatus.innerText = "● Terputus";
+                sidebarStatus.className = "text-[10px] text-rose-400 mt-1 block";
+                if(monEspTitle) {
+                    monEspTitle.innerText = "ESP32 Terputus";
+                    monEspTitle.className = "text-sm font-bold text-rose-400";
+                    monEspDesc.innerText = "Periksa koneksi perangkat";
+                }
+                if(summaryConn) {
+                    summaryConn.innerText = "Terputus";
+                    summaryConn.className = "font-bold text-rose-400";
+                }
+            }
+        }
+
+        function setDeviceUIFromFirebase(deviceId, isChecked) {
+            const dashEl = document.getElementById(`dash-${deviceId}`);
+            const ctrlEl = document.getElementById(`ctrl-${deviceId}`);
+            if (dashEl && dashEl.checked !== isChecked) dashEl.checked = isChecked;
+            if (ctrlEl && ctrlEl.checked !== isChecked) ctrlEl.checked = isChecked;
+
+            const statusText1 = document.getElementById(`status-text-${deviceId}`);
+            const statusText2 = document.getElementById(`ctrl-status-text-${deviceId}`);
+            const loadEl = document.getElementById(`load-${deviceId}`);
+            const iconBg = document.getElementById(`icon-bg-${deviceId}`);
+            const ctrlIconBg = document.getElementById(`ctrl-icon-bg-${deviceId}`);
+
+            let label = "";
+            if (deviceId === 'SolenoidPintu') {
+                label = isChecked ? "Terbuka (ON)" : "Terkunci (OFF)";
+            } else if (deviceId.includes('KipasAngin')) {
+                label = isChecked ? "Menyala (Auto)" : "Mati (Auto)";
+            } else {
+                label = isChecked ? "Menyala" : "Mati";
+            }
+
+            if (statusText1) {
+                statusText1.innerText = label;
+                statusText1.className = isChecked ? "text-xs font-medium text-emerald-400" : "text-xs font-medium text-gray-400";
+            }
+            if (statusText2) {
+                statusText2.innerText = label;
+                statusText2.className = isChecked ? "text-xs font-medium text-emerald-400" : "text-xs font-medium text-gray-400";
+            }
+            if (loadEl) {
+                loadEl.innerText = isChecked ? "ON" : "OFF";
+                loadEl.className = isChecked ? "text-[10px] text-emerald-400 font-semibold" : "text-[10px] text-gray-400 font-semibold";
+            }
+
+            if (iconBg) {
+                iconBg.className = isChecked ? "p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl transition-all shadow-lg shadow-emerald-500/20" : "p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all";
+            }
+            if (ctrlIconBg) {
+                ctrlIconBg.className = isChecked ? "p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl transition-all shadow-lg shadow-emerald-500/20" : "p-2.5 bg-white/5 text-gray-400 rounded-xl transition-all";
+            }
+
+            if (deviceId === 'KipasAngin1') {
+                const fanIcon1 = document.getElementById('fan-icon-1');
+                const ctrlFanIcon1 = document.getElementById('ctrl-fan-icon-1');
+                if (fanIcon1) fanIcon1.className = isChecked ? "w-5 h-5 animate-spin-slow text-emerald-400" : "w-5 h-5 text-gray-400";
+                if (ctrlFanIcon1) ctrlFanIcon1.className = isChecked ? "w-5 h-5 animate-spin-slow text-emerald-400" : "w-5 h-5 text-gray-400";
+            }
+            if (deviceId === 'KipasAngin2') {
+                const fanIcon2 = document.getElementById('fan-icon-2');
+                const ctrlFanIcon2 = document.getElementById('ctrl-fan-icon-2');
+                if (fanIcon2) fanIcon2.className = isChecked ? "w-5 h-5 animate-spin-slow text-emerald-400" : "w-5 h-5 text-gray-400";
+                if (ctrlFanIcon2) ctrlFanIcon2.className = isChecked ? "w-5 h-5 animate-spin-slow text-emerald-400" : "w-5 h-5 text-gray-400";
+            }
+
+            updateActiveLoadCount();
+        }
+
+        function updateActiveLoadCount() {
+            const deviceKeys = ['LampuWC', 'LampuRuangTamu', 'LampuBelakang', 'LampuHias', 'KipasAngin1', 'KipasAngin2', 'SolenoidPintu'];
+            let activeCount = 0;
+            deviceKeys.forEach(k => {
+                const el = document.getElementById(`dash-${k}`);
+                if (el && el.checked) activeCount++;
+            });
+            const summaryEl = document.getElementById('summary-active-load');
+            if(summaryEl) summaryEl.innerText = activeCount + " Perangkat";
+        }
+
+        function updateDeviceState(deviceId, isChecked) {
+            const val = isChecked ? 1 : 0;
+            db.ref(`Kontrol/${deviceId}`).set(val);
+        }
+
+        function toggleAllDevices(turnOn) {
+            const deviceKeys = ['LampuWC', 'LampuRuangTamu', 'LampuBelakang', 'LampuHias', 'SolenoidPintu'];
+            deviceKeys.forEach(id => {
+                updateDeviceState(id, turnOn);
+            });
+        }
+
+        function updateRealtimeClock() {
+            const now = new Date();
+            const optionsDate = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('header-date').innerText = now.toLocaleDateString('id-ID', optionsDate);
+            document.getElementById('header-time').innerText = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WITA';
+        }
+
+        function switchTab(tabId) {
+            const tabs = ['dashboard', 'monitoring', 'kontrol', 'riwayat'];
+            tabs.forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`nav-${t}`).classList.remove('active-tab');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).classList.add('active-tab');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function initCharts() {
+            const timeLabels = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
+            
+            const ctxSuhu = document.getElementById('chartSuhu').getContext('2d');
+            chartSuhuInstance = new Chart(ctxSuhu, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [
+                        { label: 'Suhu 1', data: [27.4, 28.2, 29.1, 28.6, 29.5, 28.8, 28.4], borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Suhu 2', data: [27.1, 27.8, 28.5, 28.1, 28.9, 28.2, 27.9], borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } } } }
+            });
+
+            const ctxLembab = document.getElementById('chartKelembaban').getContext('2d');
+            chartKelembabanInstance = new Chart(ctxLembab, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [
+                        { label: 'Kelembaban 1', data: [73, 71, 69, 70, 68, 71, 72], borderColor: '#A855F7', backgroundColor: 'rgba(168, 85, 247, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Kelembaban 2', data: [69, 68, 66, 67, 65, 67, 68], borderColor: '#34D399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } } } }
+            });
+        }
+
+        function recordHistoryLog() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            const s1 = parseFloat(lastSensorData.s1);
+            const h1 = parseInt(lastSensorData.h1);
+            const s2 = parseFloat(lastSensorData.s2);
+            const h2 = parseInt(lastSensorData.h2);
+
+            const status = (s1 > 32 || s2 > 32) ? 'Tidak Normal' : 'Normal';
+
+            historyLog.push({
+                no: historyLog.length + 1,
+                date: dateStr,
+                time: timeStr,
+                s1, h1, s2, h2, status
+            });
+
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history-table-body');
+            const sensorFilter = document.getElementById('filter-sensor').value;
+            tbody.innerHTML = '';
+
+            let sumS1 = 0, sumH1 = 0, sumS2 = 0, sumH2 = 0;
+            const count = historyLog.length > 0 ? historyLog.length : 1;
+
+            const filtered = historyLog.filter(item => {
+                sumS1 += item.s1; sumH1 += item.h1; sumS2 += item.s2; sumH2 += item.h2;
+                if (sensorFilter === 'normal') return item.status === 'Normal';
+                if (sensorFilter === 'warning') return item.status === 'Tidak Normal';
+                return true;
+            });
+
+            filtered.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-white/[0.02] border-b border-white/5 transition-all';
+                tr.innerHTML = `
+                    <td class="px-4 py-3.5 font-medium text-white">${row.no}</td>
+                    <td class="px-4 py-3.5">${row.date}</td>
+                    <td class="px-4 py-3.5 font-mono text-emerald-400">${row.time}</td>
+                    <td class="px-4 py-3.5 font-bold text-orange-400">${row.s1} °C</td>
+                    <td class="px-4 py-3.5 font-bold text-purple-400">${row.h1} %</td>
+                    <td class="px-4 py-3.5 font-bold text-emerald-400">${row.s2} °C</td>
+                    <td class="px-4 py-3.5 font-bold text-blue-400">${row.h2} %</td>
+                    <td class="px-4 py-3.5">
+                        <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold ${row.status === 'Normal' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">
+                            <span>●</span>
+                            <span>${row.status}</span>
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('avg-s1').innerText = (sumS1 / count).toFixed(1);
+            document.getElementById('avg-h1').innerText = (sumH1 / count).toFixed(1);
+            document.getElementById('avg-s2').innerText = (sumS2 / count).toFixed(1);
+            document.getElementById('avg-h2').innerText = (sumH2 / count).toFixed(1);
+        }
+
+        function filterTableData() {
+            renderHistoryTable();
+        }
+
+        function downloadCSV() {
+            if (historyLog.length === 0) {
+                alert("Belum ada data riwayat untuk diunduh.");
+                return;
+            }
+            let csv = 'No,Hari Tanggal,Waktu,Suhu 1 (C),Kelembaban 1 (%),Suhu 2 (C),Kelembaban 2 (%),Status\n';
+            historyLog.forEach(r => {
+                csv += `${r.no},"${r.date}",${r.time},${r.s1},${r.h1},${r.s2},${r.h2},${r.status}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "riwayat_sensor_smarthome.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
