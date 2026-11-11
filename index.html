@@ -879,6 +879,7 @@
                         h2: parseInt(data.kelembapan2 || 0)
                     };
                     updateSensorUI(lastSensorData);
+                    updateSensorCharts(lastSensorData);
 
                     const kipas1On = lastSensorData.s1 > 35;
                     const kipas2On = lastSensorData.s2 > 35;
@@ -1066,34 +1067,133 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // Grafik menggunakan pembacaan sensor aktual dari Firebase.
+        // Maksimal 7 titik terakhir ditampilkan agar tampilan tetap ringkas.
+        const chartHistory = {
+            labels: [],
+            suhu1: [],
+            suhu2: [],
+            kelembaban1: [],
+            kelembaban2: []
+        };
+
         function initCharts() {
-            const timeLabels = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
-            
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                },
+                elements: {
+                    line: { tension: 0.4, borderWidth: 3 },
+                    point: { radius: 3, hoverRadius: 5, borderWidth: 1.5 }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#9CA3AF' }
+                    },
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#9CA3AF', maxRotation: 0 }
+                    }
+                }
+            };
+
             const ctxSuhu = document.getElementById('chartSuhu').getContext('2d');
             chartSuhuInstance = new Chart(ctxSuhu, {
                 type: 'line',
                 data: {
-                    labels: timeLabels,
+                    labels: chartHistory.labels,
                     datasets: [
-                        { label: 'Suhu 1', data: [27.4, 28.2, 29.1, 28.6, 29.5, 28.8, 28.4], borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
-                        { label: 'Suhu 2', data: [27.1, 27.8, 28.5, 28.1, 28.9, 28.2, 27.9], borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
+                        {
+                            label: 'Suhu 1',
+                            data: chartHistory.suhu1,
+                            borderColor: '#F97316',
+                            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                            pointBackgroundColor: '#F97316',
+                            fill: true,
+                            spanGaps: false
+                        },
+                        {
+                            label: 'Suhu 2',
+                            data: chartHistory.suhu2,
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            pointBackgroundColor: '#10B981',
+                            fill: true,
+                            spanGaps: false
+                        }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } } } }
+                options: chartOptions
             });
 
             const ctxLembab = document.getElementById('chartKelembaban').getContext('2d');
             chartKelembabanInstance = new Chart(ctxLembab, {
                 type: 'line',
                 data: {
-                    labels: timeLabels,
+                    labels: chartHistory.labels,
                     datasets: [
-                        { label: 'Kelembaban 1', data: [73, 71, 69, 70, 68, 71, 72], borderColor: '#A855F7', backgroundColor: 'rgba(168, 85, 247, 0.1)', fill: true, tension: 0.4 },
-                        { label: 'Kelembaban 2', data: [69, 68, 66, 67, 65, 67, 68], borderColor: '#34D399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true, tension: 0.4 }
+                        {
+                            label: 'Kelembaban 1',
+                            data: chartHistory.kelembaban1,
+                            borderColor: '#A855F7',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            pointBackgroundColor: '#A855F7',
+                            fill: true,
+                            spanGaps: false
+                        },
+                        {
+                            label: 'Kelembaban 2',
+                            data: chartHistory.kelembaban2,
+                            borderColor: '#34D399',
+                            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                            pointBackgroundColor: '#34D399',
+                            fill: true,
+                            spanGaps: false
+                        }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } } } }
+                options: chartOptions
             });
+        }
+
+        function updateSensorCharts(sensorData) {
+            if (!chartSuhuInstance || !chartKelembabanInstance) return;
+
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            const values = {
+                s1: Number(sensorData.s1),
+                s2: Number(sensorData.s2),
+                h1: Number(sensorData.h1),
+                h2: Number(sensorData.h2)
+            };
+
+            if (!Object.values(values).every(Number.isFinite)) return;
+
+            chartHistory.labels.push(timeLabel);
+            chartHistory.suhu1.push(values.s1);
+            chartHistory.suhu2.push(values.s2);
+            chartHistory.kelembaban1.push(values.h1);
+            chartHistory.kelembaban2.push(values.h2);
+
+            Object.values(chartHistory).forEach(series => {
+                if (series.length > 7) series.shift();
+            });
+
+            chartSuhuInstance.update('none');
+            chartKelembabanInstance.update('none');
         }
 
         function recordHistoryLog() {
